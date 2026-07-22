@@ -1535,8 +1535,8 @@ async function findOabCandidates(A, totalM, mode) {
     let r = half * 0.75;
     let best = null;
 
-    // 반복 조정: 경로를 찾아보고, 길면 목표 지점을 당기고 짧으면 밀기 (최대 3번)
-    for (let iter = 0; iter < 3; iter++) {
+    // 반복 조정: 경로를 찾아보고, 길면 목표 지점을 당기고 짧으면 밀기 (최대 4번)
+    for (let iter = 0; iter < 4; iter++) {
       try {
         const T = destPoint(A, brg, r);
         const route = await fetchRoute(A, T, mode);
@@ -1545,7 +1545,7 @@ async function findOabCandidates(A, totalM, mode) {
         if (!best || Math.abs(route.distance - half) < Math.abs(best.distance - half)) {
           best = route;
         }
-        if (Math.abs(route.distance - half) / half < 0.08) break;
+        if (Math.abs(route.distance - half) / half < 0.06) break;
 
         r = r * (half / route.distance);
         r = Math.max(200, Math.min(r, half * 1.5));
@@ -1561,10 +1561,27 @@ async function findOabCandidates(A, totalM, mode) {
   return found;
 }
 
-// ── 루프 후보 찾기: 출발점을 한 꼭짓점으로 하는 정사각형 경유점을
-//    길찾기 엔진에 한 번에 요청 (출발→B→C→D→출발) ──
+// 출발점 A를 첫 꼭짓점으로 하는 정N각형의 나머지 꼭짓점들을 구함
+// (변 길이 s, 방향 rot에서 출발해 매 꼭짓점마다 외각(360/n)만큼 꺾으며 한 바퀴)
+// n이 클수록 정사각형보다 꺾임이 완만해서 더 자연스러운 루프 모양이 됨
+function polygonVertices(A, rot, s, n) {
+  const verts = [A];
+  let heading = rot;
+  let cur = A;
+  const turn = 360 / n;
+  for (let i = 1; i < n; i++) {
+    cur = destPoint(cur, heading, s);
+    verts.push(cur);
+    heading += turn;
+  }
+  return verts;
+}
+
+// ── 루프 후보 찾기: 출발점을 한 꼭짓점으로 하는 정육각형 경유점을
+//    길찾기 엔진에 한 번에 요청 (출발→…→출발) ──
 async function findLoopCandidates(A, totalM, mode) {
-  const rotations = [0, 90, 180, 270]; // 사각형을 어느 방향으로 펼칠지
+  const CORNERS = 6; // 정사각형(4)보다 꺾임이 완만해 실제 도로에서 더 자연스럽게 이어짐
+  const rotations = [0, 90, 180, 270]; // 다각형을 어느 방향으로 펼칠지
   const dirNames = { 0: "북동", 90: "남동", 180: "남서", 270: "북서" };
   const colors = { 0: "#e05252", 90: "#8e44ad", 180: "#2471a3", 270: "#d4881c" };
   const found = [];
@@ -1572,28 +1589,24 @@ async function findLoopCandidates(A, totalM, mode) {
   for (const rot of rotations) {
     showStatus(dirNames[rot] + " 루프 탐색 중…");
 
-    // 둘레가 totalM인 정사각형의 한 변 길이에서 출발 (길이 더 길 테니 조금 줄여서)
-    let s = (totalM / 4) * 0.8;
+    // 둘레가 totalM인 정육각형의 한 변 길이에서 출발 (길이 더 길 테니 조금 줄여서)
+    let s = (totalM / CORNERS) * 0.8;
     let best = null;
 
-    for (let iter = 0; iter < 3; iter++) {
+    for (let iter = 0; iter < 4; iter++) {
       try {
-        // 출발점 A를 한 꼭짓점으로 하는 정사각형의 나머지 세 꼭짓점
-        const B = destPoint(A, rot, s);
-        const C = destPoint(A, rot + 45, s * Math.SQRT2); // 대각선 방향 꼭짓점
-        const D = destPoint(A, rot + 90, s);
-
-        const route = await fetchRouteVia([A, B, C, D, A], mode);
+        const verts = polygonVertices(A, rot, s, CORNERS);
+        const route = await fetchRouteVia([...verts, A], mode);
         if (!route.distance) break;
 
         if (!best || Math.abs(route.distance - totalM) < Math.abs(best.distance - totalM)) {
           best = route;
         }
-        if (Math.abs(route.distance - totalM) / totalM < 0.08) break;
+        if (Math.abs(route.distance - totalM) / totalM < 0.06) break;
 
-        // 비례 조정: 사각형 크기를 통째로 키우거나 줄임
+        // 비례 조정: 다각형 크기를 통째로 키우거나 줄임
         s = s * (totalM / route.distance);
-        s = Math.max(150, Math.min(s, (totalM / 4) * 1.5));
+        s = Math.max(100, Math.min(s, (totalM / CORNERS) * 1.5));
       } catch (err) {
         break;
       }
