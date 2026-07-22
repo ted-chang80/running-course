@@ -356,7 +356,14 @@
     color: var(--muted);
     font-variant-numeric: tabular-nums;
   }
-  .sim-runner-icon { font-size: 20px; line-height: 1; text-align: center; }
+  .sim-runner-icon { width: 30px; height: 30px; }
+  .sim-runner-arrow {
+    width: 30px;
+    height: 30px;
+    transform-origin: 15px 15px;
+    transition: transform 0.12s linear;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+  }
 
   /* 지점 배지 (출발 / 도착 / 반환) */
   .map-badge {
@@ -1606,25 +1613,28 @@ document.getElementById("clearBtn").addEventListener("click", function () {
 //     마커를 옮깁니다. 배속(5×~60×)만큼 화면상 시간을 빨리 흘려보내요.
 // ─────────────────────────────────────────────
 
-// 경로(좌표 배열)를 따라 시작점에서 targetM만큼 간 지점의 좌표를 구함
-function pointAtDistance(path, targetM) {
+// 경로(좌표 배열)를 따라 시작점에서 targetM만큼 간 지점의 좌표와,
+// 그 지점에서 향하고 있는 방위각(진행 방향)을 함께 구함
+function pointAndHeadingAtDistance(path, targetM) {
   if (path.length === 0) return null;
-  if (path.length === 1) return path[0];
+  if (path.length === 1) return { pos: path[0], heading: 0 };
 
   let acc = 0;
   for (let i = 1; i < path.length; i++) {
     const d = map.distance(path[i - 1], path[i]);
     if (acc + d >= targetM || i === path.length - 1) {
-      if (d === 0) return path[i];
+      const heading = bearing(path[i - 1], path[i]);
+      if (d === 0) return { pos: path[i], heading };
       const f = Math.max(0, Math.min(1, (targetM - acc) / d));
-      return L.latLng(
+      const pos = L.latLng(
         path[i - 1].lat + (path[i].lat - path[i - 1].lat) * f,
         path[i - 1].lng + (path[i].lng - path[i - 1].lng) * f
       );
+      return { pos, heading };
     }
     acc += d;
   }
-  return path[path.length - 1];
+  return { pos: path[path.length - 1], heading: 0 };
 }
 
 // "초" 단위 시간을 "12:34" 또는 "1:02:34" 형태로 표시
@@ -1662,21 +1672,36 @@ function updateSimUI() {
   playBtn.textContent = simPlaying ? "⏸" : frac >= 1 && frac > 0 ? "↺" : "▶";
 }
 
-// 현재 진행률에 맞는 위치로 달리는 마커를 옮김 (없으면 새로 만듦)
+// 현재 진행률에 맞는 위치로 달리는 마커를 옮기고, 진행 방향으로 화살표를 돌림
 function moveSimMarker() {
   const frac = simTotalSec > 0 ? simElapsedSec / simTotalSec : 0;
-  const pos = pointAtDistance(fullPath(), simTotalM * frac);
-  if (!pos) return;
+  const result = pointAndHeadingAtDistance(fullPath(), simTotalM * frac);
+  if (!result) return;
+  const { pos, heading } = result;
 
   if (!simMarker) {
     simMarker = L.marker(pos, {
-      icon: L.divIcon({ className: "sim-runner-icon", html: "🏃", iconSize: [26, 26], iconAnchor: [13, 15] }),
+      icon: L.divIcon({
+        className: "",
+        html:
+          '<div class="sim-runner-icon"><div class="sim-runner-arrow">' +
+          '<svg width="30" height="30" viewBox="0 0 30 30">' +
+          '<circle cx="15" cy="15" r="10" fill="#0e7c86" stroke="#ffffff" stroke-width="2.5"/>' +
+          '<path d="M15 4 L20.5 14 L15 11 L9.5 14 Z" fill="#ffffff"/>' +
+          '</svg></div></div>',
+        iconSize: [30, 30],
+        iconAnchor: [15, 15],
+      }),
       zIndexOffset: 1000,
       interactive: false,
     }).addTo(map);
   } else {
     simMarker.setLatLng(pos);
   }
+
+  const el = simMarker.getElement();
+  const arrowEl = el && el.querySelector(".sim-runner-arrow");
+  if (arrowEl) arrowEl.style.transform = "rotate(" + heading.toFixed(1) + "deg)";
 }
 
 function simStep(ts) {
