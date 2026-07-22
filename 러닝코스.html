@@ -523,6 +523,62 @@ L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
 }).addTo(map);
 
 // ─────────────────────────────────────────────
+// 1-1) 횡단보도 표시
+//      기본 지도 타일에는 횡단보도가 거의 안 보여서, OSM 원본 데이터에서
+//      횡단보도(highway=crossing) 위치를 Overpass API로 따로 받아와
+//      화면에 점으로 표시합니다. 지도를 옮기거나 줌할 때마다 새로 받아오고,
+//      너무 넓은 범위(줌 아웃)에서는 개수가 많아지니 일정 줌 이상에서만 표시해요.
+// ─────────────────────────────────────────────
+const CROSSING_MIN_ZOOM = 16;
+const crossingLayer = L.layerGroup().addTo(map);
+let crossingDebounce = null;
+let crossingFetchId = 0;
+
+function scheduleCrossingUpdate() {
+  clearTimeout(crossingDebounce);
+  crossingDebounce = setTimeout(updateCrossings, 400);
+}
+
+async function updateCrossings() {
+  if (map.getZoom() < CROSSING_MIN_ZOOM) {
+    crossingLayer.clearLayers();
+    return;
+  }
+
+  const myId = ++crossingFetchId;
+  const b = map.getBounds();
+  const bbox = b.getSouth() + "," + b.getWest() + "," + b.getNorth() + "," + b.getEast();
+  const query = '[out:json][timeout:25];node["highway"="crossing"](' + bbox + ");out body;";
+
+  try {
+    const res = await fetch("https://overpass-api.de/api/interpreter", {
+      method: "POST",
+      body: query,
+    });
+    if (!res.ok) throw new Error("overpass http error");
+    const data = await res.json();
+
+    if (myId !== crossingFetchId) return; // 응답 오는 사이 화면이 또 바뀌었으면 무시 (오래된 결과 버림)
+
+    crossingLayer.clearLayers();
+    data.elements.forEach(function (el) {
+      L.circleMarker([el.lat, el.lon], {
+        radius: 4,
+        weight: 1.5,
+        color: "#ffffff",
+        fillColor: "#f2b705",
+        fillOpacity: 1,
+        interactive: false,
+      }).addTo(crossingLayer);
+    });
+  } catch (err) {
+    // 횡단보도는 부가 정보라, 조회에 실패해도 앱 사용에는 지장 없게 조용히 넘어감
+  }
+}
+
+map.on("moveend", scheduleCrossingUpdate);
+
+// ─────────────────────────────────────────────
 // 2) 코스 데이터
 //    이번 버전의 핵심 변화: 클릭한 점(waypoint) 사이를
 //    직선이 아니라 "구간(leg)"으로 관리합니다.
