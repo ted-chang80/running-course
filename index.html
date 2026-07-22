@@ -103,20 +103,71 @@
   /* 경로 종류 선택 */
   .mode-row {
     margin-top: 12px;
+    border: 0;
+    min-width: 0;
+  }
+  .mode-row legend {
+    margin-bottom: 7px;
+    font-size: 12.5px;
+    font-weight: 650;
+    color: var(--muted);
+  }
+  .mode-options {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .mode-options input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .mode-options label {
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 13px;
-  }
-  .mode-row select {
-    flex: 1;
-    font: inherit;
-    font-size: 13px;
-    padding: 6px 8px;
+    gap: 7px;
+    min-width: 0;
+    padding: 8px 9px;
     border: 1px solid var(--line);
     border-radius: 10px;
     background: #fff;
     color: var(--ink);
+    font-size: 12.5px;
+    line-height: 1.25;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+  }
+  .mode-options label:hover { background: #f4f8f8; border-color: #b8d4d7; }
+  .mode-check {
+    display: grid;
+    place-items: center;
+    flex: 0 0 17px;
+    width: 17px;
+    height: 17px;
+    border: 1.5px solid #b8c2ca;
+    border-radius: 5px;
+    color: transparent;
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1;
+    transition: border-color 0.15s, background 0.15s, color 0.15s;
+  }
+  .mode-options input:checked + label {
+    border-color: var(--route);
+    background: #eef8f8;
+    box-shadow: inset 0 0 0 1px rgba(14, 124, 134, 0.08);
+    font-weight: 650;
+  }
+  .mode-options input:checked + label .mode-check {
+    border-color: var(--route);
+    background: var(--route);
+    color: #fff;
+  }
+  .mode-options input:focus-visible + label {
+    outline: 2px solid var(--route);
+    outline-offset: 2px;
   }
 
   /* 왕복/루프 코스 자동 생성 */
@@ -455,15 +506,22 @@
   </div>
   <ul class="search-results" id="searchResults"></ul>
 
-  <div class="mode-row">
-    <label for="routeMode">경로 종류</label>
-    <select id="routeMode">
-      <option value="foot" selected>인도 · 보행로</option>
-      <option value="hike">등산로 · 임도</option>
-      <option value="bike">자전거도로</option>
-      <option value="straight">직선 (길 무시)</option>
-    </select>
-  </div>
+  <fieldset class="mode-row">
+    <legend>경로 종류</legend>
+    <div class="mode-options">
+      <input type="radio" name="routeMode" id="routeModeFoot" value="foot" checked />
+      <label for="routeModeFoot"><span class="mode-check" aria-hidden="true">✓</span>인도 · 보행로</label>
+
+      <input type="radio" name="routeMode" id="routeModeHike" value="hike" />
+      <label for="routeModeHike"><span class="mode-check" aria-hidden="true">✓</span>등산로 · 임도</label>
+
+      <input type="radio" name="routeMode" id="routeModeBike" value="bike" />
+      <label for="routeModeBike"><span class="mode-check" aria-hidden="true">✓</span>자전거도로</label>
+
+      <input type="radio" name="routeMode" id="routeModeStraight" value="straight" />
+      <label for="routeModeStraight"><span class="mode-check" aria-hidden="true">✓</span>직선 (길 무시)</label>
+    </div>
+  </fieldset>
 
   <div class="gen-row">
     <select id="genType">
@@ -574,6 +632,20 @@
 // 1) 지도 만들기
 // ─────────────────────────────────────────────
 const map = L.map("map").setView([33.4996, 126.5312], 14); // 제주시청 근처
+
+// 경로 종류는 체크 카드로 보여주되, 실제 경로 엔진은 한 번에 하나만 사용합니다.
+function getRouteMode() {
+  const selected = document.querySelector('input[name="routeMode"]:checked');
+  return selected ? selected.value : "foot";
+}
+
+function setRouteMode(mode) {
+  const options = document.querySelectorAll('input[name="routeMode"]');
+  const matched = Array.from(options).find(function (option) {
+    return option.value === mode;
+  });
+  (matched || document.getElementById("routeModeFoot")).checked = true;
+}
 
 L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
   maxZoom: 19,
@@ -719,7 +791,7 @@ async function addWaypoint(clicked) {
   redraw();
 
   // ② 경로 종류가 "직선"이 아니면, 선택한 길 종류의 경로를 받아와 직선을 교체
-  const mode = document.getElementById("routeMode").value;
+  const mode = getRouteMode();
   if (mode !== "straight") {
     try {
       const route = await fetchRoute(prev, clicked, mode);
@@ -1522,7 +1594,7 @@ async function generateCourse() {
 
   const A = waypoints[0]; // 출발점
   const genKind = document.getElementById("genType").value; // "loop" 또는 "oab"
-  let mode = document.getElementById("routeMode").value;
+  let mode = getRouteMode();
   if (mode === "straight") mode = "foot"; // 직선 모드일 땐 도보 기준으로 생성
 
   const genBtn = document.getElementById("genBtn");
@@ -2034,7 +2106,7 @@ document.getElementById("saveBtn").addEventListener("click", function () {
     name: name,
     savedAt: Date.now(),
     distKm: (totalM / 1000).toFixed(1),
-    mode: lastGeneratedMode || document.getElementById("routeMode").value,
+    mode: lastGeneratedMode || getRouteMode(),
     turnIdx: turnPoint ? waypoints.indexOf(turnPoint) : -1,
     pts: savePts.map(function (p) { return [Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6))]; }),
   });
@@ -2118,7 +2190,7 @@ async function loadCourseFromPoints(pts, mode, turnIdx) {
   markers.length = 0;
 
   const resolvedMode = CODE_MODE[mode] || mode || "foot";
-  document.getElementById("routeMode").value = resolvedMode;
+  setRouteMode(resolvedMode);
   showStatus("코스를 불러오는 중…");
 
   const anchors = pts.map(function (p) { return L.latLng(p[0], p[1]); });
@@ -2160,7 +2232,7 @@ async function loadCourseFromPoints(pts, mode, turnIdx) {
 function buildShareUrl() {
   // 자동 생성한 코스면 실제 생성에 쓰인 앵커를, 손으로 그린 코스면 waypoints를 그대로 사용
   const sharePts = lastGeneratedAnchors || waypoints;
-  const mode = lastGeneratedMode || document.getElementById("routeMode").value;
+  const mode = lastGeneratedMode || getRouteMode();
   const modeCode = MODE_CODE[mode] || "f";
   const turnIdx = turnPoint ? waypoints.indexOf(turnPoint) : -1;
   const pts = sharePts.map(function (p) { return p.lat.toFixed(6) + "," + p.lng.toFixed(6); }).join("|");
