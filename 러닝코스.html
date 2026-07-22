@@ -611,15 +611,19 @@ const polyline = L.polyline([], {
 
 // ─────────────────────────────────────────────
 // 3) 지도 클릭 → 구간 추가
+//    (장소 검색 결과를 클릭했을 때도 같은 함수를 재사용합니다)
 // ─────────────────────────────────────────────
-map.on("click", async function (e) {
+map.on("click", function (e) {
+  addWaypoint(e.latlng);
+});
+
+async function addWaypoint(clicked) {
   // 자동 생성 후보를 보여주는 중에는 일반 그리기를 잠시 막음
   if (previewing) {
     showStatus("후보를 선택하거나 취소를 눌러주세요");
     return;
   }
 
-  const clicked = e.latlng;
   const prevIdx = waypoints.length - 1; // 직전 점의 위치 (없으면 -1)
   const prev = prevIdx >= 0 ? waypoints[prevIdx] : null;
 
@@ -673,7 +677,7 @@ map.on("click", async function (e) {
 
   // ③ 확정된 구간의 고도를 조회 (경사 반영 시간 계산용)
   fetchLegElevation(leg);
-});
+}
 
 // ─────────────────────────────────────────────
 // 4) 경로 조회: 선택한 길 종류에 따라 다른 엔진을 사용
@@ -1235,8 +1239,11 @@ async function searchPlace() {
       const li = document.createElement("li");
       li.innerHTML = "<strong>" + name + "</strong><br><span class='sub'>" + sub + "</span>";
       li.addEventListener("click", function () {
-        map.setView([Number(r.lat), Number(r.lon)], 16);
+        const latlng = L.latLng(Number(r.lat), Number(r.lon));
+        map.setView(latlng, 16);
         searchResults.innerHTML = "";
+        searchInput.value = "";
+        addWaypoint(latlng); // 지도 클릭과 똑같이 바로 경유지점으로 추가
       });
       searchResults.appendChild(li);
     });
