@@ -306,6 +306,58 @@
   .profile-chart svg { display: block; width: 100%; height: auto; }
   .chart-empty { font-size: 12px; color: var(--muted); }
 
+  /* 러닝 시뮬레이션 */
+  .sim-row { margin-top: 10px; display: flex; align-items: center; gap: 8px; }
+  .sim-row button {
+    font: inherit;
+    font-size: 15px;
+    width: 34px;
+    height: 34px;
+    flex: 0 0 auto;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: #fff;
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .sim-row button:hover:not(:disabled) { background: #f4f7f9; }
+  .sim-row button:disabled { opacity: 0.4; cursor: default; }
+  .sim-row #simPlayBtn { background: var(--route); border-color: var(--route); color: #fff; }
+  .sim-row #simPlayBtn:hover:not(:disabled) { background: #0b6a72; }
+  .sim-row select {
+    flex: 1;
+    font: inherit;
+    font-size: 13px;
+    padding: 6px 8px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #fff;
+    color: var(--ink);
+  }
+  .sim-row select:disabled { opacity: 0.4; }
+  .sim-progress {
+    margin-top: 10px;
+    height: 6px;
+    border-radius: 999px;
+    background: #eef1f3;
+    overflow: hidden;
+  }
+  .sim-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--route);
+    border-radius: 999px;
+  }
+  .sim-readout {
+    margin-top: 8px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 12.5px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .sim-runner-icon { font-size: 20px; line-height: 1; text-align: center; }
+
   /* 지점 배지 (출발 / 도착 / 반환) */
   .map-badge {
     pointer-events: none;
@@ -433,6 +485,23 @@
   <div class="profile-chart" id="profileChart">
     <p class="chart-empty">고도 데이터를 기다리는 중…</p>
   </div>
+
+  <h2>러닝 시뮬레이션</h2>
+  <div class="sim-row">
+    <button id="simPlayBtn" disabled>▶</button>
+    <select id="simSpeed" disabled>
+      <option value="5">5×</option>
+      <option value="10">10×</option>
+      <option value="20" selected>20×</option>
+      <option value="60">60×</option>
+    </select>
+    <button id="simResetBtn" title="처음으로" disabled>⟲</button>
+  </div>
+  <div class="sim-progress"><div class="sim-progress-fill" id="simProgressFill"></div></div>
+  <div class="sim-readout">
+    <span id="simDistReadout">0.00 / 0.00 km</span>
+    <span id="simTimeReadout">0:00 / 0:00</span>
+  </div>
 </div>
 
 <script>
@@ -461,6 +530,15 @@ const elevSegments = []; // 고도 색상을 입힌 선 조각들
 let turnPoint = null;    // 반환점 좌표 (없으면 null)
 const previewLines = []; // 자동 생성 후보 미리보기 선들
 let previewing = false;  // 후보 선택 중인지 여부
+
+// 러닝 시뮬레이션 상태
+let simPlaying = false;   // 재생 중인지
+let simElapsedSec = 0;    // 지금까지 "달린" 시간 (페이스 기준, 초)
+let simTotalSec = 0;      // 코스 전체를 페이스대로 달리면 걸리는 시간 (초)
+let simTotalM = 0;        // 시뮬레이션 기준 코스 전체 거리 (m)
+let simRafId = null;
+let simLastTs = null;     // 직전 애니메이션 프레임 시각
+let simMarker = null;     // 달리는 마커
 
 const polyline = L.polyline([], {
   color: "#0e7c86",
@@ -670,6 +748,7 @@ function redraw() {
   updateArrows();
   updateLabels();
   updateStats();
+  resetSim(); // 코스 모양이 바뀌었으니 시뮬레이션은 처음부터
 
   document.getElementById("hint").innerHTML =
     waypoints.length === 0
@@ -891,7 +970,10 @@ function formatMin(totalMin) {
   return h + "시간 " + m + "분";
 }
 
-document.getElementById("pace").addEventListener("change", updateStats);
+document.getElementById("pace").addEventListener("change", function () {
+  updateStats();
+  rescaleSimForPace(); // 페이스만 바뀐 거라 진행 "비율"은 유지
+});
 
 // 잠깐 보여주고 사라지는 상태 메시지
 let statusTimer = null;
@@ -1516,6 +1598,165 @@ document.getElementById("clearBtn").addEventListener("click", function () {
   document.getElementById("statusMsg").textContent = "";
   redraw();
 });
+
+// ─────────────────────────────────────────────
+// 11) 러닝 시뮬레이션
+//     설정한 페이스로 코스 전체를 달리는 데 걸리는 시간을 계산해두고,
+//     재생 중에는 그 시간 안에서 진행률만큼 경로 위 지점을 구해
+//     마커를 옮깁니다. 배속(5×~60×)만큼 화면상 시간을 빨리 흘려보내요.
+// ─────────────────────────────────────────────
+
+// 경로(좌표 배열)를 따라 시작점에서 targetM만큼 간 지점의 좌표를 구함
+function pointAtDistance(path, targetM) {
+  if (path.length === 0) return null;
+  if (path.length === 1) return path[0];
+
+  let acc = 0;
+  for (let i = 1; i < path.length; i++) {
+    const d = map.distance(path[i - 1], path[i]);
+    if (acc + d >= targetM || i === path.length - 1) {
+      if (d === 0) return path[i];
+      const f = Math.max(0, Math.min(1, (targetM - acc) / d));
+      return L.latLng(
+        path[i - 1].lat + (path[i].lat - path[i - 1].lat) * f,
+        path[i - 1].lng + (path[i].lng - path[i - 1].lng) * f
+      );
+    }
+    acc += d;
+  }
+  return path[path.length - 1];
+}
+
+// "초" 단위 시간을 "12:34" 또는 "1:02:34" 형태로 표시
+function formatClock(totalSec) {
+  const s = Math.max(0, Math.round(totalSec));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  const mm = h > 0 ? String(m).padStart(2, "0") : String(m);
+  const ss = String(sec).padStart(2, "0");
+  return h > 0 ? h + ":" + mm + ":" + ss : mm + ":" + ss;
+}
+
+// 재생/배속/리셋 버튼 상태와 진행률 바, 거리·시간 표시를 갱신
+function updateSimUI() {
+  const playBtn = document.getElementById("simPlayBtn");
+  const speedSel = document.getElementById("simSpeed");
+  const resetBtn = document.getElementById("simResetBtn");
+  const fill = document.getElementById("simProgressFill");
+  const distEl = document.getElementById("simDistReadout");
+  const timeEl = document.getElementById("simTimeReadout");
+
+  const hasCourse = simTotalM > 0;
+  playBtn.disabled = !hasCourse;
+  speedSel.disabled = !hasCourse;
+  resetBtn.disabled = !hasCourse;
+
+  const frac = simTotalSec > 0 ? Math.min(1, simElapsedSec / simTotalSec) : 0;
+  fill.style.width = (frac * 100).toFixed(1) + "%";
+
+  const totalKm = simTotalM / 1000;
+  distEl.textContent = (totalKm * frac).toFixed(2) + " / " + totalKm.toFixed(2) + " km";
+  timeEl.textContent = formatClock(simElapsedSec) + " / " + formatClock(simTotalSec);
+
+  playBtn.textContent = simPlaying ? "⏸" : frac >= 1 && frac > 0 ? "↺" : "▶";
+}
+
+// 현재 진행률에 맞는 위치로 달리는 마커를 옮김 (없으면 새로 만듦)
+function moveSimMarker() {
+  const frac = simTotalSec > 0 ? simElapsedSec / simTotalSec : 0;
+  const pos = pointAtDistance(fullPath(), simTotalM * frac);
+  if (!pos) return;
+
+  if (!simMarker) {
+    simMarker = L.marker(pos, {
+      icon: L.divIcon({ className: "sim-runner-icon", html: "🏃", iconSize: [26, 26], iconAnchor: [13, 15] }),
+      zIndexOffset: 1000,
+      interactive: false,
+    }).addTo(map);
+  } else {
+    simMarker.setLatLng(pos);
+  }
+}
+
+function simStep(ts) {
+  if (!simPlaying) return;
+  if (simLastTs === null) simLastTs = ts;
+  const dt = (ts - simLastTs) / 1000;
+  simLastTs = ts;
+
+  const speed = Number(document.getElementById("simSpeed").value);
+  simElapsedSec += dt * speed;
+
+  if (simElapsedSec >= simTotalSec) {
+    simElapsedSec = simTotalSec;
+    moveSimMarker();
+    updateSimUI();
+    pauseSim();
+    showStatus("시뮬레이션 완주!");
+    return;
+  }
+
+  moveSimMarker();
+  updateSimUI();
+  simRafId = requestAnimationFrame(simStep);
+}
+
+function playSim() {
+  if (simTotalM <= 0) {
+    showStatus("코스를 먼저 그려주세요");
+    return;
+  }
+  if (simElapsedSec >= simTotalSec) simElapsedSec = 0; // 완주 후 다시 누르면 처음부터
+  simPlaying = true;
+  simLastTs = null;
+  moveSimMarker();
+  updateSimUI();
+  simRafId = requestAnimationFrame(simStep);
+}
+
+function pauseSim() {
+  simPlaying = false;
+  if (simRafId) cancelAnimationFrame(simRafId);
+  simRafId = null;
+  simLastTs = null;
+  updateSimUI();
+}
+
+// 코스 모양이 바뀌었을 때(그리기/되돌리기/지우기 등) 시뮬레이션을 처음 상태로
+function resetSim() {
+  simPlaying = false;
+  if (simRafId) cancelAnimationFrame(simRafId);
+  simRafId = null;
+  simLastTs = null;
+  simElapsedSec = 0;
+  simTotalM = legs.reduce((sum, leg) => sum + leg.distance, 0);
+  const paceMinPerKm = Number(document.getElementById("pace").value);
+  simTotalSec = (simTotalM / 1000) * paceMinPerKm * 60;
+  if (simMarker) {
+    simMarker.remove();
+    simMarker = null;
+  }
+  updateSimUI();
+}
+
+// 페이스만 바뀐 경우: 코스는 그대로이니 "진행 비율"을 유지한 채 시간만 다시 계산
+function rescaleSimForPace() {
+  const paceMinPerKm = Number(document.getElementById("pace").value);
+  const frac = simTotalSec > 0 ? simElapsedSec / simTotalSec : 0;
+  simTotalSec = (simTotalM / 1000) * paceMinPerKm * 60;
+  simElapsedSec = frac * simTotalSec;
+  updateSimUI();
+}
+
+document.getElementById("simPlayBtn").addEventListener("click", function () {
+  if (simPlaying) pauseSim();
+  else playSim();
+});
+
+document.getElementById("simResetBtn").addEventListener("click", resetSim);
+
+resetSim(); // 초기 상태(버튼 비활성화 등) 세팅
 </script>
 </body>
 </html>
