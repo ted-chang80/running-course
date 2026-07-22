@@ -100,62 +100,68 @@
   .search-results li.msg { cursor: default; color: var(--muted); }
   .search-results li.msg:hover { background: #fff; }
 
-  /* 길 따라 그리기 토글 */
-  .snap-row {
+  /* 경로 종류 선택 */
+  .mode-row {
     margin-top: 12px;
     display: flex;
     align-items: center;
-    gap: 7px;
-    font-size: 12.5px;
-    cursor: pointer;
-    user-select: none;
+    gap: 8px;
+    font-size: 13px;
   }
-  .snap-row input { accent-color: var(--route); width: 15px; height: 15px; cursor: pointer; }
-
-  /* 모양으로 그리기 */
-  .shape-row {
-    margin-top: 14px;
-    padding-top: 12px;
-    border-top: 1px solid var(--line);
-  }
-  .shape-row > label {
-    display: block;
-    font-size: 12.5px;
-    font-weight: 700;
-  }
-  .shape-controls {
-    margin-top: 8px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .shape-controls select {
+  .mode-row select {
     flex: 1;
-    min-width: 0;
     font: inherit;
     font-size: 13px;
-    padding: 7px 8px;
+    padding: 6px 8px;
     border: 1px solid var(--line);
     border-radius: 10px;
-    color: var(--ink);
     background: #fff;
+    color: var(--ink);
   }
-  .shape-controls input {
-    width: 52px;
+
+  /* 왕복/루프 코스 자동 생성 */
+  .gen-row { margin-top: 8px; display: flex; align-items: center; gap: 6px; }
+  .gen-row select {
+    flex: 0 0 auto;
     font: inherit;
     font-size: 13px;
-    padding: 7px 6px;
+    padding: 6px 6px;
     border: 1px solid var(--line);
     border-radius: 10px;
+    background: #fff;
     color: var(--ink);
-    text-align: right;
   }
-  .shape-controls .km-unit { font-size: 12.5px; color: var(--muted); }
-  .shape-hint {
-    margin-top: 6px;
-    font-size: 11.5px;
-    color: var(--muted);
-    line-height: 1.5;
+  .gen-row input {
+    flex: 0 0 60px;
+    font: inherit;
+    font-size: 13px;
+    padding: 6px 8px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    text-align: right;
+    color: var(--ink);
+  }
+  .gen-row .unit { font-size: 13px; color: var(--muted); }
+  .gen-row button {
+    flex: 1;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 7px 0;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #fff;
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .gen-row button:hover { background: #f4f7f9; }
+  .gen-row button:disabled { opacity: 0.5; cursor: default; }
+  .search-results li .dot {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    margin-right: 6px;
   }
 
   .distance {
@@ -242,8 +248,6 @@
     transition: background 0.15s;
   }
   .buttons button:hover { background: #f4f7f9; }
-  button:disabled { opacity: 0.55; cursor: not-allowed; }
-  button:disabled:hover { background: inherit; }
   .buttons button:focus-visible { outline: 2px solid var(--route); outline-offset: 2px; }
   .buttons button.danger { color: #c0392b; }
   .buttons button.primary { background: var(--route); border-color: var(--route); color: #fff; }
@@ -343,29 +347,26 @@
   </div>
   <ul class="search-results" id="searchResults"></ul>
 
-  <label class="snap-row">
-    <input type="checkbox" id="snapToggle" checked />
-    길 따라 그리기 (인도 · 등산로 · 임도)
-  </label>
-
-  <div class="shape-row">
-    <label for="shapeSelect">동물·사물 모양으로 그리기</label>
-    <div class="shape-controls">
-      <select id="shapeSelect">
-        <option value="rabbit">🐰 토끼</option>
-        <option value="cat">🐱 고양이</option>
-        <option value="fish">🐟 물고기</option>
-        <option value="heart">❤️ 하트</option>
-        <option value="star">⭐ 별</option>
-        <option value="moon">🌙 달</option>
-        <option value="sun">☀️ 해</option>
-      </select>
-      <input id="shapeKm" type="number" min="0.5" max="20" step="0.1" value="2" />
-      <span class="km-unit">km</span>
-    </div>
-    <button id="shapeBtn" class="primary" style="width: 100%; margin-top: 8px;">지도 중심에 모양 그리기</button>
-    <p class="shape-hint">기존 코스는 지워지고 새 모양으로 그려져요. "길 따라 그리기"가 켜져 있으면 인도·등산로·임도를 따라 최대한 비슷한 모양으로 그리고, 꺼져 있으면 고른 모양 그대로 직선으로 그려요.</p>
+  <div class="mode-row">
+    <label for="routeMode">경로 종류</label>
+    <select id="routeMode">
+      <option value="foot" selected>인도 · 보행로</option>
+      <option value="hike">등산로 · 임도</option>
+      <option value="bike">자전거도로</option>
+      <option value="straight">직선 (길 무시)</option>
+    </select>
   </div>
+
+  <div class="gen-row">
+    <select id="genType">
+      <option value="loop" selected>루프</option>
+      <option value="oab">왕복</option>
+    </select>
+    <input id="genDist" type="number" min="1" max="42" step="0.5" value="10" />
+    <span class="unit">km</span>
+    <button id="genBtn">코스 자동 생성</button>
+  </div>
+  <ul class="search-results" id="genResults"></ul>
 
   <div class="distance">
     <span id="distanceValue">0</span><span class="unit" id="distanceUnit">m</span>
@@ -458,6 +459,8 @@ const arrows = [];       // 진행 방향 화살표들
 const badges = [];       // 출발/도착/반환 배지들
 const elevSegments = []; // 고도 색상을 입힌 선 조각들
 let turnPoint = null;    // 반환점 좌표 (없으면 null)
+const previewLines = []; // 자동 생성 후보 미리보기 선들
+let previewing = false;  // 후보 선택 중인지 여부
 
 const polyline = L.polyline([], {
   color: "#0e7c86",
@@ -466,25 +469,15 @@ const polyline = L.polyline([], {
 }).addTo(map);
 
 // ─────────────────────────────────────────────
-// 2-1) 동물·사물 모양 라이브러리
-//    각 도형은 중심이 (0,0)이고 가장 먼 점까지 거리가 1인
-//    정규화된 좌표들의 닫힌 다각선(마지막 점 = 첫 점)입니다.
-//    실제 지도에 그릴 때 목표 거리(km)에 맞춰 확대/축소합니다.
-// ─────────────────────────────────────────────
-const SHAPE_LIBRARY = {
-  heart: [[0.0,0.484],[0.014,0.5562],[0.1026,0.7258],[0.2981,0.8823],[0.5698,0.9215],[0.8356,0.8036],[1.0,0.5636],[1.0,0.2727],[0.8356,-0.0117],[0.5698,-0.2702],[0.2981,-0.5062],[0.1026,-0.7142],[0.014,-0.8653],[-0.0,-0.9215],[-0.014,-0.8653],[-0.1026,-0.7142],[-0.2981,-0.5062],[-0.5698,-0.2702],[-0.8356,-0.0117],[-1.0,0.2727],[-1.0,0.5636],[-0.8356,0.8036],[-0.5698,0.9215],[-0.2981,0.8823],[-0.1026,0.7258],[-0.014,0.5562],[0.0,0.484]],
-  star: [[0.0,0.9511],[-0.2596,0.2569],[-1.0,0.2245],[-0.42,-0.2369],[-0.618,-0.9511],[-0.0,-0.542],[0.618,-0.9511],[0.42,-0.2369],[1.0,0.2245],[0.2596,0.2569],[0.0,0.9511]],
-  moon: [[-0.6969,1.0],[-0.4576,0.9709],[-0.2322,0.8855],[-0.0338,0.7485],[0.1261,0.5681],[0.2381,0.3546],[0.2958,0.1205],[0.2958,-0.1205],[0.2381,-0.3546],[0.1261,-0.5681],[-0.0338,-0.7485],[-0.2322,-0.8855],[-0.4576,-0.9709],[-0.6969,-1.0],[-0.1469,-0.85],[0.0565,-0.8253],[0.2481,-0.7526],[0.4168,-0.6362],[0.5526,-0.4829],[0.6479,-0.3014],[0.6969,-0.1025],[0.6969,0.1025],[0.6479,0.3014],[0.5526,0.4829],[0.4168,0.6362],[0.2481,0.7526],[0.0565,0.8253],[-0.1469,0.85],[-0.6969,1.0]],
-  sun: [[0.0,1.0],[-0.2105,0.5081],[-0.7071,0.7071],[-0.5081,0.2105],[-1.0,0.0],[-0.5081,-0.2105],[-0.7071,-0.7071],[-0.2105,-0.5081],[-0.0,-1.0],[0.2105,-0.5081],[0.7071,-0.7071],[0.5081,-0.2105],[1.0,-0.0],[0.5081,0.2105],[0.7071,0.7071],[0.2105,0.5081],[0.0,1.0]],
-  rabbit: [[0.2667,-0.0048],[0.401,-0.115],[0.4927,-0.2626],[0.5322,-0.4318],[0.5152,-0.6047],[0.4435,-0.763],[0.3247,-0.8898],[0.1714,-0.9717],[0.0,-1.0],[-0.1714,-0.9717],[-0.3247,-0.8898],[-0.4435,-0.763],[-0.5152,-0.6047],[-0.5322,-0.4318],[-0.4927,-0.2626],[-0.401,-0.115],[-0.2667,-0.0048],[-0.4,1.0],[-0.2489,0.9556],[-0.1156,0.1111],[0.1156,0.1111],[0.2489,0.9556],[0.4,1.0],[0.2667,-0.0048]],
-  cat: [[0.3824,0.2128],[0.5508,0.0422],[0.6481,-0.1769],[0.6615,-0.4162],[0.5894,-0.6448],[0.4411,-0.8332],[0.2358,-0.9569],[0.0,-1.0],[-0.2358,-0.9569],[-0.4411,-0.8332],[-0.5894,-0.6448],[-0.6615,-0.4162],[-0.6481,-0.1769],[-0.5508,0.0422],[-0.3824,0.2128],[-0.8333,1.0],[-0.2,0.3889],[0.2,0.3889],[0.8333,1.0],[0.3824,0.2128]],
-  fish: [[1.0,-0.115],[0.75,0.305],[0.35,0.505],[0.1,0.735],[-0.1,0.485],[-0.35,0.305],[-1.0,0.385],[-0.55,-0.115],[-1.0,-0.615],[-0.35,-0.535],[-0.1,-0.715],[0.35,-0.735],[0.75,-0.535],[1.0,-0.115]],
-};
-
-// ─────────────────────────────────────────────
 // 3) 지도 클릭 → 구간 추가
 // ─────────────────────────────────────────────
 map.on("click", async function (e) {
+  // 자동 생성 후보를 보여주는 중에는 일반 그리기를 잠시 막음
+  if (previewing) {
+    showStatus("후보를 선택하거나 취소를 눌러주세요");
+    return;
+  }
+
   const clicked = e.latlng;
   const prevIdx = waypoints.length - 1; // 직전 점의 위치 (없으면 -1)
   const prev = prevIdx >= 0 ? waypoints[prevIdx] : null;
@@ -512,10 +505,11 @@ map.on("click", async function (e) {
   legs.push(leg);
   redraw();
 
-  // ② 길 따라 그리기가 켜져 있으면, 도보 경로를 받아와서 직선을 교체
-  if (document.getElementById("snapToggle").checked) {
+  // ② 경로 종류가 "직선"이 아니면, 선택한 길 종류의 경로를 받아와 직선을 교체
+  const mode = document.getElementById("routeMode").value;
+  if (mode !== "straight") {
     try {
-      const route = await fetchFootRoute(prev, clicked);
+      const route = await fetchRoute(prev, clicked, mode);
       leg.coords = route.coords;
       leg.distance = route.distance;
 
@@ -541,18 +535,33 @@ map.on("click", async function (e) {
 });
 
 // ─────────────────────────────────────────────
-// 4) 도보 경로 조회
-//    OSRM(OSM 기반 무료 길찾기 엔진)의 foot 프로필 사용, 키 불필요
-//    인도(footway) · 등산로(path) · 임도(track)를 모두 걸을 수 있는
-//    길로 취급해서 그 위로 경로를 이어줍니다
-//    ※ routing.openstreetmap.de 는 커뮤니티가 운영하는 서버라
-//      개인적인 가벼운 사용까지만 예의를 지켜 주세요
+// 4) 경로 조회: 선택한 길 종류에 따라 다른 엔진을 사용
+//    - 인도·보행로, 자전거도로 → OSRM (routing.openstreetmap.de)
+//    - 등산로·임도 → BRouter의 hiking 프로필 (brouter.de)
+//      (OSRM에는 등산 전용 프로필이 없어서 산길에 특화된
+//       BRouter를 씁니다. 산길·임도를 우선해서 경로를 찾아줘요)
+//    둘 다 OSM 기반 무료 서비스이고 API 키가 필요 없습니다
+//    ※ 커뮤니티 운영 서버라 개인적인 가벼운 사용까지만 예의를 지켜 주세요
 // ─────────────────────────────────────────────
-async function fetchFootRoute(a, b) {
+// 두 점 사이 경로 (기존 그리기용)
+async function fetchRoute(a, b, mode) {
+  return fetchRouteVia([a, b], mode);
+}
+
+// 여러 경유점을 한 번에 잇는 경로 (루프 자동 생성용)
+// OSRM은 "좌표;좌표;좌표", BRouter는 "좌표|좌표|좌표" 형태로
+// 요청 한 번에 여러 지점을 처리할 수 있습니다
+async function fetchRouteVia(pts, mode) {
+  if (mode === "hike") return fetchBRouter(pts);
+  if (mode === "bike") return fetchOsrm(pts, "routed-bike/route/v1/bike");
+  return fetchOsrm(pts, "routed-foot/route/v1/foot");
+}
+
+async function fetchOsrm(pts, enginePath) {
+  const coordStr = pts.map((p) => p.lng + "," + p.lat).join(";");
   const url =
-    "https://routing.openstreetmap.de/routed-foot/route/v1/foot/" +
-    a.lng + "," + a.lat + ";" + b.lng + "," + b.lat +
-    "?overview=full&geometries=geojson";
+    "https://routing.openstreetmap.de/" + enginePath + "/" +
+    coordStr + "?overview=full&geometries=geojson";
 
   const res = await fetch(url);
   if (!res.ok) throw new Error("routing http error");
@@ -565,6 +574,35 @@ async function fetchFootRoute(a, b) {
   // GeoJSON은 [경도, 위도] 순서라서 Leaflet의 [위도, 경도]로 뒤집어 줌
   const coords = route.geometry.coordinates.map((c) => L.latLng(c[1], c[0]));
   return { coords: coords, distance: route.distance }; // distance는 미터
+}
+
+async function fetchBRouter(pts) {
+  const lonlats = pts.map((p) => p.lng + "," + p.lat).join("|");
+  const url =
+    "https://brouter.de/brouter?lonlats=" + lonlats +
+    "&profile=hiking-beta&alternativeidx=0&format=geojson";
+
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("brouter http error");
+  const data = await res.json();
+
+  const feat = data.features && data.features[0];
+  if (!feat || !feat.geometry || feat.geometry.coordinates.length < 2) {
+    throw new Error("no route");
+  }
+
+  const coords = feat.geometry.coordinates.map((c) => L.latLng(c[1], c[0]));
+
+  // BRouter는 총 거리를 track-length 속성으로 알려줌 (문자열 → 숫자 변환)
+  let distance = Number(feat.properties && feat.properties["track-length"]);
+  if (!isFinite(distance) || distance <= 0) {
+    // 혹시 값이 없으면 좌표들을 이어서 직접 계산
+    distance = 0;
+    for (let i = 1; i < coords.length; i++) {
+      distance += map.distance(coords[i - 1], coords[i]);
+    }
+  }
+  return { coords: coords, distance: distance };
 }
 
 // ─────────────────────────────────────────────
@@ -1203,7 +1241,273 @@ document.getElementById("gpxBtn").addEventListener("click", function () {
   showStatus("GPX 파일로 저장했어요");
 });
 
-function clearCourse() {
+// ─────────────────────────────────────────────
+// 10) 왕복 코스 자동 생성
+//     출발점에서 동서남북 4방향으로 "목표 거리의 절반"짜리
+//     경로를 찾아보고, 갈 만한 후보들을 보여줍니다.
+//     후보를 고르면 온 길을 되짚어 오는 왕복 코스가 완성됩니다.
+// ─────────────────────────────────────────────
+
+// 어떤 점에서 특정 방향(방위각)으로 dist 미터 떨어진 지점의 좌표 구하기
+// (지구가 둥글다는 것을 고려한 표준 공식)
+function destPoint(a, bearingDeg, dist) {
+  const R = 6371000; // 지구 반지름 (m)
+  const br = (bearingDeg * Math.PI) / 180;
+  const lat1 = (a.lat * Math.PI) / 180;
+  const lng1 = (a.lng * Math.PI) / 180;
+  const dr = dist / R;
+
+  const lat2 = Math.asin(
+    Math.sin(lat1) * Math.cos(dr) + Math.cos(lat1) * Math.sin(dr) * Math.cos(br)
+  );
+  const lng2 =
+    lng1 +
+    Math.atan2(
+      Math.sin(br) * Math.sin(dr) * Math.cos(lat1),
+      Math.cos(dr) - Math.sin(lat1) * Math.sin(lat2)
+    );
+  return L.latLng((lat2 * 180) / Math.PI, (lng2 * 180) / Math.PI);
+}
+
+document.getElementById("genBtn").addEventListener("click", generateCourse);
+
+async function generateCourse() {
+  if (previewing) return;
+  if (waypoints.length === 0) {
+    showStatus("먼저 지도를 클릭해 출발점을 찍어주세요");
+    return;
+  }
+  const totalKm = Number(document.getElementById("genDist").value);
+  if (!(totalKm > 0)) {
+    showStatus("목표 거리를 입력해주세요");
+    return;
+  }
+  if (legs.length > 0 && !confirm("지금 그려진 코스를 지우고 새로 만들까요?")) {
+    return;
+  }
+
+  const A = waypoints[0]; // 출발점
+  const genKind = document.getElementById("genType").value; // "loop" 또는 "oab"
+  let mode = document.getElementById("routeMode").value;
+  if (mode === "straight") mode = "foot"; // 직선 모드일 땐 도보 기준으로 생성
+
+  const genBtn = document.getElementById("genBtn");
+  genBtn.disabled = true;
+  clearPreview();
+
+  const found =
+    genKind === "loop"
+      ? await findLoopCandidates(A, totalKm * 1000, mode)
+      : await findOabCandidates(A, totalKm * 1000, mode);
+
+  genBtn.disabled = false;
+  showStatus("");
+
+  if (found.length === 0) {
+    showStatus("코스를 찾지 못했어요. 다른 위치에서 시도해 보세요");
+    return;
+  }
+  showPreview(found);
+}
+
+// ── 왕복 후보 찾기: 4방향으로 편도 경로를 찾고 되짚어 오기 ──
+async function findOabCandidates(A, totalM, mode) {
+  const half = totalM / 2; // 편도 목표 거리
+  const bearings = [0, 90, 180, 270];
+  const dirNames = { 0: "북쪽", 90: "동쪽", 180: "남쪽", 270: "서쪽" };
+  const colors = { 0: "#e05252", 90: "#8e44ad", 180: "#2471a3", 270: "#d4881c" };
+  const found = [];
+
+  for (const brg of bearings) {
+    showStatus(dirNames[brg] + " 방향 탐색 중…");
+
+    // 길은 직선보다 20~30% 길다는 가정으로 목표 지점을 조금 가깝게 시작
+    let r = half * 0.75;
+    let best = null;
+
+    // 반복 조정: 경로를 찾아보고, 길면 목표 지점을 당기고 짧으면 밀기 (최대 3번)
+    for (let iter = 0; iter < 3; iter++) {
+      try {
+        const T = destPoint(A, brg, r);
+        const route = await fetchRoute(A, T, mode);
+        if (!route.distance) break;
+
+        if (!best || Math.abs(route.distance - half) < Math.abs(best.distance - half)) {
+          best = route;
+        }
+        if (Math.abs(route.distance - half) / half < 0.08) break;
+
+        r = r * (half / route.distance);
+        r = Math.max(200, Math.min(r, half * 1.5));
+      } catch (err) {
+        break; // 이 방향은 길을 못 찾음 (바다 등) → 포기
+      }
+    }
+
+    if (best && Math.abs(best.distance - half) / half < 0.25) {
+      found.push({ type: "oab", dir: dirNames[brg] + " 왕복", color: colors[brg], route: best, totalM: best.distance * 2 });
+    }
+  }
+  return found;
+}
+
+// ── 루프 후보 찾기: 출발점을 한 꼭짓점으로 하는 정사각형 경유점을
+//    길찾기 엔진에 한 번에 요청 (출발→B→C→D→출발) ──
+async function findLoopCandidates(A, totalM, mode) {
+  const rotations = [0, 90, 180, 270]; // 사각형을 어느 방향으로 펼칠지
+  const dirNames = { 0: "북동", 90: "남동", 180: "남서", 270: "북서" };
+  const colors = { 0: "#e05252", 90: "#8e44ad", 180: "#2471a3", 270: "#d4881c" };
+  const found = [];
+
+  for (const rot of rotations) {
+    showStatus(dirNames[rot] + " 루프 탐색 중…");
+
+    // 둘레가 totalM인 정사각형의 한 변 길이에서 출발 (길이 더 길 테니 조금 줄여서)
+    let s = (totalM / 4) * 0.8;
+    let best = null;
+
+    for (let iter = 0; iter < 3; iter++) {
+      try {
+        // 출발점 A를 한 꼭짓점으로 하는 정사각형의 나머지 세 꼭짓점
+        const B = destPoint(A, rot, s);
+        const C = destPoint(A, rot + 45, s * Math.SQRT2); // 대각선 방향 꼭짓점
+        const D = destPoint(A, rot + 90, s);
+
+        const route = await fetchRouteVia([A, B, C, D, A], mode);
+        if (!route.distance) break;
+
+        if (!best || Math.abs(route.distance - totalM) < Math.abs(best.distance - totalM)) {
+          best = route;
+        }
+        if (Math.abs(route.distance - totalM) / totalM < 0.08) break;
+
+        // 비례 조정: 사각형 크기를 통째로 키우거나 줄임
+        s = s * (totalM / route.distance);
+        s = Math.max(150, Math.min(s, (totalM / 4) * 1.5));
+      } catch (err) {
+        break;
+      }
+    }
+
+    if (best && Math.abs(best.distance - totalM) / totalM < 0.25) {
+      found.push({ type: "loop", dir: dirNames[rot] + " 루프", color: colors[rot], route: best, totalM: best.distance });
+    }
+  }
+  return found;
+}
+
+// 후보들을 점선으로 지도에 미리 보여주고, 목록에서 고르게 하기
+function showPreview(cands) {
+  previewing = true;
+  const listEl = document.getElementById("genResults");
+  listEl.innerHTML = "";
+
+  cands.forEach(function (cand) {
+    previewLines.push(
+      L.polyline(cand.route.coords, {
+        color: cand.color,
+        weight: 4,
+        opacity: 0.85,
+        dashArray: "6 8",
+        interactive: false,
+      }).addTo(map)
+    );
+
+    const totalKmTxt = (cand.totalM / 1000).toFixed(1);
+    const li = document.createElement("li");
+    li.innerHTML =
+      '<span class="dot" style="background:' + cand.color + '"></span>' +
+      "<strong>" + cand.dir + "</strong> " + totalKmTxt + " km";
+    li.addEventListener("click", function () { applyCandidate(cand); });
+    listEl.appendChild(li);
+  });
+
+  const cancel = document.createElement("li");
+  cancel.className = "msg";
+  cancel.style.cursor = "pointer";
+  cancel.textContent = "취소";
+  cancel.addEventListener("click", clearPreview);
+  listEl.appendChild(cancel);
+
+  // 모든 후보가 보이게 지도를 맞춰줌
+  map.fitBounds(L.featureGroup(previewLines).getBounds(), { padding: [40, 40] });
+}
+
+function clearPreview() {
+  previewLines.forEach(function (l) { l.remove(); });
+  previewLines.length = 0;
+  document.getElementById("genResults").innerHTML = "";
+  previewing = false;
+}
+
+// 고른 후보를 실제 코스로 만들기
+function applyCandidate(cand) {
+  clearPreview();
+
+  // 기존 코스를 모두 지우고
+  waypoints.length = 0;
+  legs.length = 0;
+  turnPoint = null;
+  markers.forEach(function (m) { m.remove(); });
+  markers.length = 0;
+
+  const coords = cand.route.coords;
+
+  if (cand.type === "loop") {
+    // ── 루프: 경로를 절반에서 두 구간으로 잘라서 담음
+    //    (화살표가 두 개 생기고, 중간 지점 마커도 찍히도록)
+    const mid = Math.floor(coords.length / 2);
+    const c1 = coords.slice(0, mid + 1);
+    const c2 = coords.slice(mid);
+
+    let d1 = 0;
+    for (let i = 1; i < c1.length; i++) d1 += map.distance(c1[i - 1], c1[i]);
+
+    const leg1 = { coords: c1, distance: d1, samples: null };
+    const leg2 = {
+      coords: c2,
+      distance: Math.max(0, cand.route.distance - d1),
+      samples: null,
+    };
+
+    waypoints.push(coords[0], coords[mid], coords[coords.length - 1]);
+    legs.push(leg1, leg2);
+  } else {
+    // ── 왕복: 가는 구간 + 되짚어 오는 구간
+    const A = coords[0];                 // 출발점 (길 위로 스냅된 위치)
+    const T = coords[coords.length - 1]; // 반환점
+
+    const out = { coords: coords, distance: cand.route.distance, samples: null };
+    const back = {
+      coords: coords.slice().reverse(),
+      distance: cand.route.distance,
+      samples: null,
+    };
+
+    waypoints.push(A, T, A);
+    turnPoint = T;
+    legs.push(out, back);
+  }
+
+  // 경유 지점 마커 찍기 (첫 점은 출발점이라 오렌지색)
+  waypoints.forEach(function (p, i) {
+    const isStart = i === 0;
+    markers.push(
+      L.circleMarker(p, {
+        radius: isStart ? 8 : 6,
+        color: "#ffffff",
+        weight: 2.5,
+        fillColor: isStart ? "#f76b1c" : "#0e7c86",
+        fillOpacity: 1,
+      }).addTo(map)
+    );
+  });
+
+  redraw();
+  legs.forEach(fetchLegElevation); // 두 구간의 고도 조회
+}
+
+document.getElementById("clearBtn").addEventListener("click", function () {
   waypoints.length = 0;
   legs.length = 0;
   turnPoint = null;
@@ -1211,166 +1515,6 @@ function clearCourse() {
   markers.length = 0;
   document.getElementById("statusMsg").textContent = "";
   redraw();
-}
-
-document.getElementById("clearBtn").addEventListener("click", clearCourse);
-
-// ─────────────────────────────────────────────
-// 10) 동물·사물 모양으로 그리기
-//    도형 라이브러리의 정규화 좌표를, 지도 중심을 기준으로
-//    "목표 거리(km) ÷ 도형의 정규화 둘레" 만큼 확대해 실제
-//    좌표로 바꿉니다. 위도 1도와 경도 1도의 실제 거리가 달라서
-//    (고위도일수록 경도 1도가 더 짧음) 경도 쪽은 cos(위도)로 보정합니다.
-// ─────────────────────────────────────────────
-// 도형의 원래 꼭짓점은 간격이 들쭉날쭉해서(귀 끝처럼 한 번에 훌쩍 뛰는 곳도 있음),
-// 그 구간이 도로에 스냅될 때 원래 모양에서 크게 벗어날 수 있습니다.
-// 그래서 실제 변환 전에, 도형 둘레를 일정한 간격(약 numSegments 등분)으로
-// 다시 촘촘하게 나눠 점을 채워 넣습니다. 선분 위 보간이라 전체 둘레·모양은 그대로입니다.
-function resampleClosedShape(shape, numSegments) {
-  const segLens = [];
-  let total = 0;
-  for (let i = 1; i < shape.length; i++) {
-    const d = Math.hypot(shape[i][0] - shape[i - 1][0], shape[i][1] - shape[i - 1][1]);
-    segLens.push(d);
-    total += d;
-  }
-
-  const step = total / numSegments;
-  const out = [];
-  let segIdx = 0;
-  let segStart = 0;
-
-  for (let k = 0; k < numSegments; k++) {
-    const target = k * step;
-    while (segIdx < segLens.length - 1 && segStart + segLens[segIdx] < target) {
-      segStart += segLens[segIdx];
-      segIdx++;
-    }
-    const segLen = segLens[segIdx] || 0.0001;
-    const t = Math.max(0, Math.min(1, (target - segStart) / segLen));
-    const a = shape[segIdx];
-    const b = shape[segIdx + 1];
-    out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
-  }
-
-  out.push(shape[0]); // 닫힌 도형으로 마무리
-  return out;
-}
-
-function shapeToLatLngs(shapeKey, center, targetMeters) {
-  const shape = SHAPE_LIBRARY[shapeKey];
-  if (!shape) return null;
-
-  let perimeter = 0;
-  for (let i = 1; i < shape.length; i++) {
-    perimeter += Math.hypot(shape[i][0] - shape[i - 1][0], shape[i][1] - shape[i - 1][1]);
-  }
-
-  const metersPerUnit = targetMeters / perimeter;
-
-  // 구간 하나가 대략 60m가 되도록 점 개수를 정합니다 (너무 적으면 부정확,
-  // 너무 많으면 무료 길찾기 서버에 요청이 과도해짐 → 20~60개 사이로 제한)
-  const desiredLegs = Math.max(20, Math.min(60, Math.round(targetMeters / 60)));
-  const dense = resampleClosedShape(shape, desiredLegs);
-
-  const latRad = (center.lat * Math.PI) / 180;
-  const metersPerDegLat = 111320;
-  const metersPerDegLng = 111320 * Math.cos(latRad);
-
-  return dense.map(function (p) {
-    const dLat = (p[1] * metersPerUnit) / metersPerDegLat;
-    const dLng = (p[0] * metersPerUnit) / metersPerDegLng;
-    return L.latLng(center.lat + dLat, center.lng + dLng);
-  });
-}
-
-// 그리는 도중 버튼을 다시 누르면(더블클릭 등) 두 실행이 동시에 legs 배열에
-// 끼어들어 좌표 순서가 뒤섞이고 도형이 지그재그로 깨집니다.
-// 이를 막기 위해 그리는 동안에는 버튼을 비활성화합니다.
-let isDrawingShape = false;
-
-async function drawShape(shapeKey, targetKm) {
-  if (isDrawingShape) return;
-  isDrawingShape = true;
-  const btn = document.getElementById("shapeBtn");
-  btn.disabled = true;
-
-  try {
-    const targetMeters = Math.max(100, Number(targetKm) * 1000 || 2000);
-    const shapePts = shapeToLatLngs(shapeKey, map.getCenter(), targetMeters);
-    if (!shapePts) {
-      showStatus("지원하지 않는 모양이에요");
-      return;
-    }
-
-    clearCourse();
-    const statusEl = document.getElementById("statusMsg");
-    statusEl.textContent = `모양을 그리는 중… (0/${shapePts.length - 1})`;
-
-    for (let i = 0; i < shapePts.length; i++) {
-      const clicked = shapePts[i];
-      const prevIdx = waypoints.length - 1;
-      const prev = prevIdx >= 0 ? waypoints[prevIdx] : null;
-
-      waypoints.push(clicked);
-      const isStart = waypoints.length === 1;
-      const marker = L.circleMarker(clicked, {
-        radius: isStart ? 8 : 6,
-        color: "#ffffff",
-        weight: 2.5,
-        fillColor: isStart ? "#f76b1c" : "#0e7c86",
-        fillOpacity: 1,
-      }).addTo(map);
-      markers.push(marker);
-
-      if (!prev) continue;
-
-      statusEl.textContent = `모양을 그리는 중… (${i}/${shapePts.length - 1})`;
-
-      const myIdx = waypoints.length - 1;
-      const leg = {
-        coords: [prev, clicked],
-        distance: map.distance(prev, clicked),
-        samples: null,
-      };
-      legs.push(leg);
-      redraw();
-
-      // 길 따라 그리기가 켜져 있으면, 이 구간도 실제 도보 경로로 스냅합니다
-      // (인도 · 등산로 · 임도). 길을 못 찾으면 도형 그대로 직선으로 남습니다.
-      if (document.getElementById("snapToggle").checked) {
-        try {
-          const route = await fetchFootRoute(prev, clicked);
-          leg.coords = route.coords;
-          leg.distance = route.distance;
-
-          const snappedStart = route.coords[0];
-          const snappedEnd = route.coords[route.coords.length - 1];
-          waypoints[prevIdx] = snappedStart;
-          markers[prevIdx].setLatLng(snappedStart);
-          waypoints[myIdx] = snappedEnd;
-          markers[myIdx].setLatLng(snappedEnd);
-          redraw();
-        } catch (err) {
-          // 길을 못 찾으면(바다·건물 등) 이 구간만 직선으로 남겨두고 계속 진행
-        }
-      }
-
-      await fetchLegElevation(leg); // 한 구간씩 순서대로 조회 (무료 API 배려)
-    }
-
-    redraw();
-    showStatus("모양을 다 그렸어요");
-  } finally {
-    isDrawingShape = false;
-    btn.disabled = false;
-  }
-}
-
-document.getElementById("shapeBtn").addEventListener("click", function () {
-  const shapeKey = document.getElementById("shapeSelect").value;
-  const km = document.getElementById("shapeKm").value;
-  drawShape(shapeKey, km);
 });
 </script>
 </body>
