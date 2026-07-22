@@ -561,7 +561,7 @@ async function fetchOsrm(pts, enginePath) {
   const coordStr = pts.map((p) => p.lng + "," + p.lat).join(";");
   const url =
     "https://routing.openstreetmap.de/" + enginePath + "/" +
-    coordStr + "?overview=full&geometries=geojson";
+    coordStr + "?overview=full&geometries=geojson&continue_straight=true";
 
   const res = await fetch(url);
   if (!res.ok) throw new Error("routing http error");
